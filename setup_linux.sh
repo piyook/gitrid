@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# set -euo pipefail
 
 # Define the source script and destination
 SOURCE_SCRIPT="gitcrop.sh"
@@ -10,6 +10,9 @@ chmod +x "$SOURCE_SCRIPT"
 
 
 # Move the script, overwriting if necessary
-sudo cp -f "$SOURCE_SCRIPT" "$DESTINATION"
+if [ -f "$DESTINATION" ]; then
+    sudo rm -f "$DESTINATION"
+fi
+sudo cp "$SOURCE_SCRIPT" "$DESTINATION"
 
 echo "Scripts successfully installed to $DESTINATION"

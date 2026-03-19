@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Version information
+VERSION="2.0.0"
+
 # Verify the main branch name
 DEFAULT_BRANCH="main"
 if ! git rev-parse --verify "refs/heads/$DEFAULT_BRANCH" >/dev/null 2>&1; then
@@ -7,11 +10,12 @@ if ! git rev-parse --verify "refs/heads/$DEFAULT_BRANCH" >/dev/null 2>&1; then
 fi
 
 # Define branches to exclude from deletion
-EXCEPTIONS="$DEFAULT_BRANCH|develop"
+EXCEPTIONS="$DEFAULT_BRANCH|dev|development"
 
 # Initialize variables
 MERGED=false
 PATTERN=""
+LIST_MODE=false
 
 # Parse arguments dynamically (allowing --merged first or last)
 for arg in "$@"; do
@@ -19,7 +23,7 @@ for arg in "$@"; do
         MERGED=true
     elif [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
         echo ""
-        echo "Usage: gitcrop [--merged | -m, --nuke] <pattern>"
+        echo "Usage: gitcrop [--merged | -m, --nuke, --list, --version] <pattern>"
         echo ""
         echo "Use --merged or -m to delete only branches that are fully merged into the main branch."
         echo "Branches matching the pattern will be deleted, excluding: $EXCEPTIONS"
@@ -27,13 +31,79 @@ for arg in "$@"; do
         echo "Example: gitcrop --merged 'feature/*' or gitcrop 'bugfix/*'"
         echo ""
         echo "Use --nuke to delete all branches matching the pattern except protected branches."
+        echo ""
+        echo "Use --list to list all branches with color coding:"
+        echo "  RED: Protected branches ($EXCEPTIONS)"
+        echo "  GREEN: Merged branches"
+        echo "  YELLOW: Unmerged branches"
+        echo ""
+        echo "Use --version to display the current version."
         exit 0
+    elif [[ "$arg" == "--version" ]]; then
+        echo "GitCrop version $VERSION"
+        exit 0
+    elif [[ "$arg" == "--list" ]]; then
+        LIST_MODE=true
     elif [[ "$arg" == "--nuke" ]]; then
         PATTERN=".*"
     else
         PATTERN="$arg"
     fi
 done
+
+# Handle list mode
+if [ "$LIST_MODE" = true ]; then
+    # Check if running in interactive terminal (supports ANSI colors)
+    if [ -t 1 ] && [ "$TERM" != "dumb" ]; then
+        
+        # Get all branches
+        ALL_BRANCHES=$(git branch --format="%(refname:short)")
+        
+        # Get merged branches
+        MERGED_BRANCHES=$(git branch --merged "$DEFAULT_BRANCH" --format="%(refname:short)")
+        
+        while IFS= read -r branch; do
+            if [[ "$branch" =~ ^($EXCEPTIONS)$ ]]; then
+                # Protected branches - red
+                echo -e "\033[31m$branch\033[0m"
+            elif echo "$MERGED_BRANCHES" | grep -q "^$branch$"; then
+                # Merged branches - green
+                echo -e "\033[32m$branch\033[0m"
+            else
+                # Unmerged branches - yellow
+                echo -e "\033[33m$branch\033[0m"
+            fi
+        done <<< "$ALL_BRANCHES"
+    else
+        # Non-interactive terminal (PowerShell, etc.) - use text labels
+        echo "Listing all branches with color coding:"
+        echo "  Protected branches ($EXCEPTIONS):"
+        echo "  Merged branches:"
+        echo "  Unmerged branches:"
+        echo ""
+        
+        # Get all branches
+        ALL_BRANCHES=$(git branch --format="%(refname:short)")
+        
+        # Get merged branches
+        MERGED_BRANCHES=$(git branch --merged "$DEFAULT_BRANCH" --format="%(refname:short)")
+        
+        while IFS= read -r branch; do
+            if [[ "$branch" =~ ^($EXCEPTIONS)$ ]]; then
+                # Protected branches
+                echo "[PROTECTED] $branch"
+            elif echo "$MERGED_BRANCHES" | grep -q "^$branch$"; then
+                # Merged branches
+                echo "[MERGED] $branch"
+            else
+                # Unmerged branches
+                echo "[UNMERGED] $branch"
+            fi
+        done <<< "$ALL_BRANCHES"
+    fi
+    
+    exit 0
+fi
 
 # Ensure a pattern is provided
 if [ -z "$PATTERN" ]; then

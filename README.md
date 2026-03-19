@@ -46,7 +46,12 @@ Are you sure? (y/n)
 
 - use '--help' or '-h' to display a help message
 - use '--nuke' to delete ALL local branches except 'main' or 'develop'
-- use '--merged' or '-m' to only delete branches MERGED into main (or master) branch matching the supplied pattern
+- u.se '--merged' or '-m' to only delete branches MERGED into main (or master) branch matching the supplied pattern
+- use '--list' to list all branches with color coding:
+  - 🔴 **Red**: Protected branches (main, dev, development)
+  - 🟢 **Green**: Merged branches (fully merged into main)
+  - 🟡 **Yellow**: Unmerged branches (not yet merged)
+- use '--version' to display the current version
 
 <i>Note: branches that are newly created from the main branch with no new commits that match the search pattern will also be deleted since they are fully merged by default.</i>
 
@@ -58,9 +63,35 @@ gitcrop feature/ --merged
 
 will only delete branches merged into main (or are identical) that match the pattern 'feature/'
 
+## Listing Branches
+
+To view all branches in your repository with color-coded status, use the `--list` option:
+
+```bash
+gitcrop --list
+```
+
+Example output:
+```
+[P] main                    # Protected branch (red)
+[M] feature/login           # Merged branch (green)
+[M] feature/dashboard       # Merged branch (green)
+[UM] feature/payment        # Unmerged branch (yellow)
+[UM] bugfix/issue-123       # Unmerged branch (yellow)
+```
+
+This feature helps you quickly identify the status of all branches in your repository before deciding which ones to clean up.
+
+**Note on Color Display:**
+- **Native terminals** (Linux, macOS, Git Bash): Full ANSI color support with colored branch names
+- **PowerShell/Windows**: Text-based labels for better compatibility:
+  - `[P] branch-name` for protected branches
+  - `[M] branch-name` for merged branches  
+  - `[UM] branch-name` for unmerged branches
+
 ## Installation
 
-To install Git Crop, simply copy the script to a directory on your PATH and make it executable.
+To install Git Crop, simply run the appropriate setup script for your system. The setup scripts can be used for both initial installation and updating to newer versions.
 
 ### Linux / Mac / WSL:
 
@@ -70,6 +101,8 @@ To install Git Crop, simply copy the script to a directory on your PATH and make
 bash setup_linux.sh
 ```
 
+The script will automatically detect if GitCrop is already installed and update it accordingly.
+
 2. Check it works:
 
 ```bash
@@ -78,15 +111,24 @@ source ~/.bashrc
 gitcrop --help
 ```
 
-### Windows Powershell:
+### Windows PowerShell:
 
-Setup using WSL with your distro of choice as above for Linux and then:
+**Prerequisites**: WSL must be installed and GitCrop must be installed in WSL first (run `bash setup_linux.sh` in WSL).
 
-1. Use Powershell to copy the gitcrop.bat batch file to any suitable location specified in your PATH E.g: C:\Windows
+1. Run the PowerShell setup script:
 
 ```PowerShell
-Move-Item gitcrop.bat C:\Windows
+# Set execution policy if needed (one-time setup)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Run the setup script
+.\setup_powershell.ps1
 ```
+
+The script will:
+- Check if GitCrop is already installed and update it if needed
+- Verify WSL is available and GitCrop is installed in WSL
+- Copy the batch file to your Windows user PATH (no admin required)
 
 2. Check it works:
 
@@ -94,7 +136,7 @@ Move-Item gitcrop.bat C:\Windows
 gitcrop --help
 ```
 
-### Note for Git Bash on Windows:
+### Git Bash on Windows:
 
 1. Run the setup script:
 
@@ -102,7 +144,7 @@ gitcrop --help
 bash setup_gitbash.sh
 ```
 
-This creates a Scripts directory in the user's home directory (if one doesn't already exist) and copies the gitcrop.sh script into it, makes it executable and adds an alias for easy access.
+This creates a Scripts directory in the user's home directory (if one doesn't already exist) and copies the gitcrop.sh script into it, makes it executable and adds an alias for easy access. The script will detect existing installations and update them automatically.
 
 2. Check it works:
 
@@ -111,6 +153,18 @@ source ~/.bashrc
 
 gitcrop --help
 ```
+
+### Updating GitCrop
+
+To update GitCrop to the latest version, simply run the same setup script again with the newer version. 
+
+### Version Management
+
+Check your current version with:
+```bash
+gitcrop version
+```
+
 
 ## License
 
