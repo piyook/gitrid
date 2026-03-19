@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Version information
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # Verify the main branch name
 DEFAULT_BRANCH="main"
@@ -46,6 +46,19 @@ for arg in "$@"; do
         LIST_MODE=true
     elif [[ "$arg" == "--nuke" ]]; then
         PATTERN=".*"
+    elif [[ "$arg" == --* ]]; then
+        echo ""
+        echo "Error: Unknown command '$arg'"
+        echo ""
+        echo "Available commands:"
+        echo "  --help, -h        Show this help message"
+        echo "  --version         Show version information"
+        echo "  --list            List all branches with color coding"
+        echo "  --merged, -m      Only delete merged branches"
+        echo "  --nuke            Delete all branches (except protected)"
+        echo ""
+        echo "Usage: gitcrop [--merged | -m, --nuke, --list, --version] <pattern>"
+        exit 1
     else
         PATTERN="$arg"
     fi
