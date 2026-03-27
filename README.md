@@ -162,7 +162,7 @@ To update gitrid to the latest version, simply run the same setup script again w
 
 Check your current version with:
 ```bash
-gitrid version
+gitrid --version
 ```
 
 
