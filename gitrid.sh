@@ -23,12 +23,12 @@ for arg in "$@"; do
         MERGED=true
     elif [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
         echo ""
-        echo "Usage: gitcrop [--merged | -m, --nuke, --list, --version] <pattern>"
+        echo "Usage: gitrid [--merged | -m, --nuke, --list, --version] <pattern>"
         echo ""
         echo "Use --merged or -m to delete only branches that are fully merged into the main branch."
         echo "Branches matching the pattern will be deleted, excluding: $EXCEPTIONS"
         echo ""
-        echo "Example: gitcrop --merged 'feature/*' or gitcrop 'bugfix/*'"
+        echo "Example: gitrid --merged 'feature/*' or gitrid 'bugfix/*'"
         echo ""
         echo "Use --nuke to delete all branches matching the pattern except protected branches."
         echo ""
@@ -40,7 +40,7 @@ for arg in "$@"; do
         echo "Use --version to display the current version."
         exit 0
     elif [[ "$arg" == "--version" ]]; then
-        echo "GitCrop version $VERSION"
+        echo "gitrid version $VERSION"
         exit 0
     elif [[ "$arg" == "--list" ]]; then
         LIST_MODE=true
@@ -57,7 +57,7 @@ for arg in "$@"; do
         echo "  --merged, -m      Only delete merged branches"
         echo "  --nuke            Delete all branches (except protected)"
         echo ""
-        echo "Usage: gitcrop [--merged | -m, --nuke, --list, --version] <pattern>"
+        echo "Usage: gitrid [--merged | -m, --nuke, --list, --version] <pattern>"
         exit 1
     else
         PATTERN="$arg"
@@ -121,12 +121,12 @@ fi
 # Ensure a pattern is provided
 if [ -z "$PATTERN" ]; then
     echo ""
-    echo "Usage: gitcrop [--merged | -m] <pattern>"
+    echo "Usage: gitrid [--merged | -m] <pattern>"
     echo ""
     echo "Use --merged or -m to delete only branches that are fully merged into the main branch."
     echo "Branches matching the pattern will be deleted, excluding: $EXCEPTIONS"
     echo ""
-    echo "Example: gitcrop --merged 'feature/*' or gitcrop 'bugfix/*'"
+    echo "Example: gitrid --merged 'feature/*' or gitrid 'bugfix/*'"
     exit 1
 fi
 

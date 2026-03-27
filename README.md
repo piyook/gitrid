@@ -1,7 +1,7 @@
-![GitHub Release](https://img.shields.io/github/v/release/piyook/gitcrop)
+![GitHub Release](https://img.shields.io/github/v/release/piyook/gitrid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Gitcrop: A Branch Batch Deletion Command Line Utility for Git Repositories :scissors:
+# gitrid: A Branch Batch Deletion Command Line Utility for Git Repositories :scissors:
 
 Lets face it - old redundant branches can quickly start to get out of hand and clog up your local repo. :face_with_spiral_eyes:
 
@@ -22,7 +22,7 @@ git branch -D $(git branch --list 'pattern/*')
 To use Git Crop, simply run the script in a Git repo with the pattern you want to match as an argument. For example:
 
 ```bash
-gitcrop feature/
+gitrid feature/
 ```
 
 This will delete all branches in the current Git repo that match the pattern "feature/" first listing them and checking you want them deleted before deleting them.
@@ -30,7 +30,7 @@ This will delete all branches in the current Git repo that match the pattern "fe
 To delete ALL branches except protected ones ('main' or 'develop') use --nuke option :bomb: :bomb: :boom:
 
 ```bash
-gitcrop --nuke
+gitrid --nuke
 
 WARNING: The following branches will be PERMANENTLY deleted:
   chore/apply_patch-2
@@ -58,7 +58,7 @@ Are you sure? (y/n)
 E.g
 
 ```bash
-gitcrop feature/ --merged
+gitrid feature/ --merged
 ```
 
 will only delete branches merged into main (or are identical) that match the pattern 'feature/'
@@ -68,7 +68,7 @@ will only delete branches merged into main (or are identical) that match the pat
 To view all branches in your repository with color-coded status, use the `--list` option:
 
 ```bash
-gitcrop --list
+gitrid --list
 ```
 
 Example output:
@@ -101,19 +101,19 @@ To install Git Crop, simply run the appropriate setup script for your system. Th
 bash setup_linux.sh
 ```
 
-The script will automatically detect if GitCrop is already installed and update it accordingly.
+The script will automatically detect if gitrid is already installed and update it accordingly.
 
 2. Check it works:
 
 ```bash
 source ~/.bashrc
 
-gitcrop --help
+gitrid --help
 ```
 
 ### Windows PowerShell:
 
-**Prerequisites**: WSL must be installed and GitCrop must be installed in WSL first (run `bash setup_linux.sh` in WSL).
+**Prerequisites**: WSL must be installed and gitrid must be installed in WSL first (run `bash setup_linux.sh` in WSL).
 
 1. Run the PowerShell setup script:
 
@@ -126,14 +126,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 The script will:
-- Check if GitCrop is already installed and update it if needed
-- Verify WSL is available and GitCrop is installed in WSL
+- Check if gitrid is already installed and update it if needed
+- Verify WSL is available and gitrid is installed in WSL
 - Copy the batch file to your Windows user PATH (no admin required)
 
 2. Check it works:
 
 ```PowerShell
-gitcrop --help
+gitrid --help
 ```
 
 ### Git Bash on Windows:
@@ -144,25 +144,25 @@ gitcrop --help
 bash setup_gitbash.sh
 ```
 
-This creates a Scripts directory in the user's home directory (if one doesn't already exist) and copies the gitcrop.sh script into it, makes it executable and adds an alias for easy access. The script will detect existing installations and update them automatically.
+This creates a Scripts directory in the user's home directory (if one doesn't already exist) and copies the gitrid.sh script into it, makes it executable and adds an alias for easy access. The script will detect existing installations and update them automatically.
 
 2. Check it works:
 
 ```bash
 source ~/.bashrc
 
-gitcrop --help
+gitrid --help
 ```
 
-### Updating GitCrop
+### Updating gitrid
 
-To update GitCrop to the latest version, simply run the same setup script again with the newer version. 
+To update gitrid to the latest version, simply run the same setup script again with the newer version. 
 
 ### Version Management
 
 Check your current version with:
 ```bash
-gitcrop version
+gitrid version
 ```
 
 

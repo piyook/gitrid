@@ -10,8 +10,8 @@ if [ ! -d "$HOME/Scripts" ]; then
 fi
 
 # Define the source script and destination
-SOURCE_SCRIPT="gitcrop.sh"
-DESTINATION="$HOME/Scripts/gitcrop.sh"
+SOURCE_SCRIPT="gitrid.sh"
+DESTINATION="$HOME/Scripts/gitrid.sh"
 
 # Ensure the script is executable
 chmod +x "$SOURCE_SCRIPT"
@@ -20,11 +20,11 @@ chmod +x "$SOURCE_SCRIPT"
 cp -f $SOURCE_SCRIPT $DESTINATION
 
 # Create an alias for easy access
-if ! grep -q "alias gitcrop" ~/.bashrc; then
-    echo "alias gitcrop='~/Scripts/gitcrop.sh'" >> ~/.bashrc
-    echo "Alias 'gitcrop' added to ~/.bashrc"
+if ! grep -q "alias gitrid" ~/.bashrc; then
+    echo "alias gitrid='~/Scripts/gitrid.sh'" >> ~/.bashrc
+    echo "Alias 'gitrid' added to ~/.bashrc"
 else
-    echo "Alias 'gitcrop' already exists in ~/.bashrc"
+    echo "Alias 'gitrid' already exists in ~/.bashrc"
 fi
 
 echo "Script successfully installed to $DESTINATION"
