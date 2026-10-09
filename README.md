@@ -1,13 +1,13 @@
 ![GitHub Release](https://img.shields.io/github/v/release/piyook/gitrid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# gitrid: A Branch Batch Deletion Command Line Utility for Git Repositories, for Humans and AI Agents :scissors:
+# gitrid: A Git Branch Batch Deletion Command Line Utility for Humans and AI Agents :scissors:
 
 Lets face it - old redundant branches can quickly start to get out of hand and clog up your local repo. :face_with_spiral_eyes:
 
 Tidying up a local repo by deleting branches one by one can be a real pain and using the usual Git command can mean accidentally deleting the wrong branch or deleting a branch you don't want to delete. :cursing_face:
 
-gitrid is a simple bash script that allows you to safely delete all branches matching a given pattern in a LOCAL git repository with a single command.
+gitrid is a simple bash script that allows you (or your coding agent) to safely delete all branches matching a given pattern in a LOCAL git repository with a single command.
 
 The search pattern automatically excludes protected branches to prevent deleting them by accident: the default branch ('main' or 'master') and 'dev', 'develop' and 'development'. A branch is protected only if its whole name is one of these, so 'feature/device-list' or 'chore/maintenance' can still be deleted. Other protected branches can be added to the EXCEPTIONS variable in the script. The branch you are on is never deleted either.
 
@@ -16,6 +16,11 @@ This script is easier and safer than using the usual Git command below:
 ```bash
 git branch -D $(git branch --list 'pattern/*')
 ```
+
+It is built to be used both ways:
+
+- **By you, in a terminal**: one command, a colour-coded list of what is merged and what is not, a count of the commits each branch would lose, and an "Are you sure?" before anything goes.
+- **By a coding agent or a script**: `--dry-run` to preview, `--yes` to delete with no prompt, `--list --porcelain` for output a program can read, and exit codes that say what happened. See [Scripts and AI agents](#scripts-and-ai-agents) and [llms.txt](llms.txt).
 
 ## Usage
 
@@ -45,10 +50,12 @@ Only local branches are deleted. Remote branches are never touched.
 Which branches:
 
 - `--merged` or `-m`: only branches fully MERGED into main (or master). A branch counts as merged if it is merged into your local main or into 'origin/main' as last fetched, so after a pull request is merged on the remote, run `git fetch` and the branch shows as merged without updating your local main first.
-- `--gone` or `-g`: only branches whose upstream branch has been deleted on the remote, as it usually is once a pull request is merged. Run `git fetch --prune` first. This finds squash-merged branches, which `--merged` can not, since their commits are never in main.
-- `--nuke`: ALL local branches except the protected ones :bomb: :bomb: :boom:
+- `--gone` or `-g`: only branches whose upstream branch has been deleted on the remote, as it usually is once a pull request is merged. Run `git fetch --prune` first. This finds squash-merged branches, which `--merged` can not, since their commits are never in main. A gone upstream is not proof of a merge: a remote branch deleted for any other reason looks the same, and a branch that was never pushed is never "gone".
+- `--nuke`: ALL local branches except the protected ones and the one you are on :bomb: :bomb: :boom:
 
-With `--merged` or `--gone` the pattern can be left out, and every branch that passes is taken. Without `--merged`, branches are deleted whether merged or not, so the list shows how many commits each one holds that are on no remote branch and not in main: work that deleting the branch would lose.
+With `--merged` or `--gone` the pattern can be left out, and every branch that passes is taken. Used together, a branch must pass both. Without `--merged`, branches are deleted whether merged or not, so the list shows how many commits each one holds that are on no remote branch and not in main: work that deleting the branch would lose.
+
+<i>Note: branches that are newly created from the main branch with no new commits that match the search pattern will also be deleted with --merged since they are fully merged by default.</i>
 
 How it runs:
 
@@ -62,7 +69,7 @@ Other commands:
 - `--version`: display the current version
 - `--help` or `-h`: display a help message
 
-<i>Note: branches that are newly created from the main branch with no new commits that match the search pattern will also be deleted with --merged since they are fully merged by default.</i>
+Options can come before or after the pattern.
 
 E.g
 
@@ -118,11 +125,22 @@ unmerged	feature/payment	2	none
 
 gitrid can be run without anyone at the keyboard:
 
-1. `git fetch --prune`, so merged and gone are judged from the remote as it is now
+1. `git fetch --prune`, so merged and gone are judged from the remote as it is now (gitrid never fetches)
 2. run the command with `--dry-run` to see what would be deleted
-3. run the same command with `--yes`
+3. an agent shows that list to its user and gets a yes. A `WARNING:` line in it means some branch holds commits that are nowhere else
+4. run the same command with `--yes`
+
+```bash
+git fetch --prune
+gitrid --merged --dry-run
+gitrid --merged --yes
+```
 
 Without `--yes`, and with nothing to answer the prompt, gitrid deletes nothing and exits with an error, so a script never takes a silent cancel for a clean-up.
+
+To decide for itself what is safe, a script reads `gitrid --list --porcelain` ([above](#listing-branches)): a branch is safe to delete if its status is `merged` or its commits on no remote are `0`.
+
+The setup scripts for Linux, Mac, WSL and Git Bash make `gitrid` an alias in `~/.bashrc`, and a shell that is not interactive does not load aliases. If an agent or script gets "command not found", call the script by its path: `/usr/local/bin/gitrid.sh`, or `~/Scripts/gitrid.sh` in Git Bash. In PowerShell `gitrid` is a batch file on the PATH and works as it is.
 
 The exit code says what happened:
 
@@ -141,13 +159,13 @@ To install gitrid, simply run the appropriate setup script for your system. The 
 
 ### Linux / Mac / WSL:
 
-1. Run the setup script:
+1. Run the setup script from the gitrid folder (it uses `sudo` to copy the script to `/usr/local/bin`):
 
 ```bash
 bash setup_linux.sh
 ```
 
-The script will automatically detect if gitrid is already installed and update it accordingly.
+If gitrid is already installed, the script replaces it with this version.
 
 2. Check it works:
 
