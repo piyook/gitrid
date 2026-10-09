@@ -230,6 +230,16 @@ gitrid --version
 ```
 
 
+## Tests
+
+The tests in `tests/gitrid.bats` run the script against a throwaway repository and check what it lists, what it deletes and its exit codes. They use [bats](https://github.com/bats-core/bats-core), and need bash, git and Node (for `npx`):
+
+```bash
+npx bats tests
+```
+
+They run on every pull request, on Linux and macOS, along with [ShellCheck](https://www.shellcheck.net/) on the shell scripts.
+
 ## License
 
 This script is released under the [MIT License](https://opensource.org/licenses/MIT).

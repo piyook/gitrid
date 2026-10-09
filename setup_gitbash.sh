@@ -17,7 +17,7 @@ DESTINATION="$HOME/Scripts/gitrid.sh"
 chmod +x "$SOURCE_SCRIPT"
 
 # Move the script, overwriting if necessary
-cp -f $SOURCE_SCRIPT $DESTINATION
+cp -f "$SOURCE_SCRIPT" "$DESTINATION"
 
 # Create an alias for easy access
 if ! grep -q "alias gitrid" ~/.bashrc; then
