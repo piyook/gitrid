@@ -9,7 +9,7 @@ Tidying up a local repo by deleting branches one by one can be a real pain and u
 
 Git Crop is a simple bash script that allows you to safely delete all branches matching a given pattern in a LOCAL git repository with a single command.
 
-The search pattern automatically excludes protected branches such as the default ('main' or 'master') branch and any 'develop' branches to prevent deleting them by accident. Other protected branches patterns can be added into the EXCEPTIONS variable command in the script.
+The search pattern automatically excludes protected branches to prevent deleting them by accident: the default branch ('main' or 'master') and 'dev', 'develop' and 'development'. A branch is protected only if its whole name is one of these, so 'feature/device-list' or 'chore/maintenance' can still be deleted. Other protected branches can be added to the EXCEPTIONS variable in the script. The branch you are on is never deleted either.
 
 This script is easier and safer than using the usual Git command below:
 
@@ -46,7 +46,7 @@ Are you sure? (y/n)
 
 - use '--help' or '-h' to display a help message
 - use '--nuke' to delete ALL local branches except 'main' or 'develop'
-- u.se '--merged' or '-m' to only delete branches MERGED into main (or master) branch matching the supplied pattern
+- use '--merged' or '-m' to only delete branches MERGED into main (or master) branch matching the supplied pattern. A branch counts as merged if it is merged into your local main or into 'origin/main' as last fetched, so after a pull request is merged on the remote, run `git fetch` and the branch shows as merged without updating your local main first
 - use '--list' to list all branches with color coding:
   - 🔴 **Red**: Protected branches (main, dev, development)
   - 🟢 **Green**: Merged branches (fully merged into main)
