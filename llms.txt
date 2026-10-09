@@ -1,0 +1,115 @@
+# gitrid
+
+> A bash script that deletes LOCAL git branches in bulk: by name pattern, by "merged into main", or by "upstream branch gone". Describes gitrid 3.1.0 (`gitrid --version`). This file is the reference for AI agents and scripts; `README.md` is the human guide. `gitrid --help` prints a short version of the same rules.
+
+## What it does and does not do
+
+- Deletes local branches only, with `git branch -D`. It never deletes or changes a remote branch, never fetches, never pushes and never switches branch.
+- Run it inside the repository to tidy. Outside one it exits `1`.
+- Never deleted: the current branch (skipped with a message), and branches named exactly `main` (or `master` when there is no local `main`), `dev`, `develop`, `development`. Matching is on the whole name: `feature/device-list` is not protected.
+- Deleting is permanent as far as gitrid goes (the commits can still be found with `git reflog` for a while). A branch without `--merged` is deleted whether its work is merged or not.
+
+## The safe way to run it (agents and scripts)
+
+1. `git fetch --prune` so that "merged" and "gone" are judged from the remote's current state. gitrid does not fetch.
+2. Preview with `--dry-run`: the list that would be deleted is printed and nothing is asked or deleted.
+3. Show the list to the user and get their agreement.
+4. Run the same command with `--yes` in place of `--dry-run`.
+
+```bash
+git fetch --prune
+gitrid --merged --dry-run     # exit 0: branches listed; exit 2: nothing to delete
+gitrid --merged --yes
+```
+
+Without `--yes` gitrid asks "Are you sure? (y/n)" on stdin. With no terminal and nothing piped in, it deletes nothing, prints an error to stderr and exits `1`. Do not answer the prompt by piping `y` in: use `--yes`.
+
+## Commands
+
+| Command | Effect |
+|---|---|
+| `gitrid <pattern>` | Delete branches whose name matches `<pattern>`, merged or not |
+| `gitrid --merged [<pattern>]`, `-m` | Only branches fully merged into local `main` or `origin/main` |
+| `gitrid --gone [<pattern>]`, `-g` | Only branches whose upstream branch was deleted on the remote |
+| `gitrid --nuke` | Every branch that is not protected. With `--merged` or `--gone`: every branch that passes them |
+| `--dry-run`, `-n` | With any of the above: list what would be deleted, then stop |
+| `--yes`, `-y` | With any of the above: delete without asking |
+| `gitrid --list`, `-l` | List every local branch with its status. Read-only |
+| `gitrid --list --porcelain` | The same list in a fixed format for a program to read |
+| `gitrid --version` | `gitrid version 3.1.0` |
+| `gitrid --help`, `-h` | Usage |
+
+- Options can come before or after the pattern. An option that is not listed is an error (exit `1`).
+- `<pattern>` is an extended regular expression (`grep -E`) matched anywhere in the branch name. It is not a glob: use `feature/`, not `feature/*`; anchor with `^fix/` or `-123$`. Quote it in the shell.
+- With `--merged` or `--gone` the pattern is optional; left out, every branch that passes is taken. With neither, a pattern (or `--nuke`) is required.
+- `--merged` and `--gone` together: a branch must pass both.
+
+## How "merged" and "gone" are decided
+
+- **merged**: every commit of the branch is in the local default branch or in `origin/<default>` as last fetched. A branch just created from main with no commits of its own counts as merged. A squash-merged or rebase-merged branch does NOT count: its commits are not in main, only their changes are.
+- **gone**: the branch has an upstream configured and that remote branch no longer exists (`git branch -vv` shows `: gone]`). Git learns this only from `git fetch --prune`. This is how to find squash-merged branches whose remote branch was deleted on merge. It says nothing about whether the work was merged: a remote branch deleted for any other reason looks the same. A branch that never had an upstream is never "gone".
+- The remote is assumed to be named `origin`.
+
+## Reading the list
+
+`gitrid --list --porcelain` prints one line per local branch, no header, no colours, four tab-separated fields:
+
+```
+status<TAB>branch<TAB>commits-on-no-remote<TAB>upstream
+```
+
+```
+protected	main	0	tracked
+merged	feat/login	0	tracked
+unmerged	feat/payment	2	none
+unmerged	feat/search	1	gone
+```
+
+- `status`: `protected`, `merged` or `unmerged` (as defined above).
+- `commits-on-no-remote`: how many commits of the branch are on no remote-tracking branch and not in the local default branch. `0` means deleting the branch loses nothing. Above `0` means deleting it loses those commits, with one exception: a `gone` branch that was squash-merged shows its commits here although their changes are in main.
+- `upstream`: `tracked` (has an upstream that exists), `gone` (its upstream was deleted on the remote) or `none` (never pushed with an upstream).
+
+Without `--porcelain` the list is for people: colours in a terminal, otherwise lines such as `[UNMERGED] feat/search (1 commit on no remote, upstream gone)`. Parse the porcelain form, not this one.
+
+A deletion or dry run prints the branches indented by two spaces, each followed by `(N commits on no remote)` when N is above 0, and a `WARNING:` line if any branch has such commits. Treat that warning as a reason to stop and ask the user.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Branches were deleted, or a dry run, list, help or version was shown |
+| `1` | Error: unknown option, no pattern, not a git repository, no answer to the prompt, or git could not delete a branch. The message is on stderr |
+| `2` | No branch matched, so there was nothing to delete (also from a dry run) |
+| `3` | The user answered the prompt with anything but `y`/`Y` |
+
+## Recipes
+
+After pull requests were merged with merge commits:
+
+```bash
+git fetch --prune && gitrid --merged --dry-run
+```
+
+After pull requests were squash-merged and their remote branches deleted:
+
+```bash
+git fetch --prune && gitrid --gone --dry-run
+```
+
+Only one kind of branch: `gitrid --merged '^feat/' --dry-run`.
+
+Branches that are safe to delete, read from the list: `status` is `merged`, or field 3 is `0`.
+
+```bash
+gitrid --list --porcelain | awk -F'\t' '$1 != "protected" && ($1 == "merged" || $3 == 0) { print $2 }'
+```
+
+## Do not
+
+- Do not run `gitrid <pattern>` or `gitrid --nuke` without `--merged` unless the user asked to delete unmerged branches: they delete work that exists nowhere else. Always `--dry-run` first and read the `commits on no remote` counts.
+- Do not treat `--gone` as proof of a merge. Check the pull request, or the count, when it matters.
+- Do not expect remote branches to be removed.
+
+## Installed copies
+
+On Windows the PowerShell command is a batch file that runs the script in WSL (`wsl /usr/local/bin/gitrid.sh`); Git Bash uses an alias to `~/Scripts/gitrid.sh`, and aliases are not loaded in a non-interactive shell, so a script there calls `~/Scripts/gitrid.sh` by path. Linux, macOS and WSL use `/usr/local/bin/gitrid.sh`. The copies are updated separately, by rerunning the setup script for each.
