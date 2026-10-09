@@ -1,7 +1,7 @@
 ![GitHub Release](https://img.shields.io/github/v/release/piyook/gitrid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# gitrid: A Branch Batch Deletion Command Line Utility for Git Repositories :scissors:
+# gitrid: A Branch Batch Deletion Command Line Utility for Git Repositories, for Humans and AI Agents :scissors:
 
 Lets face it - old redundant branches can quickly start to get out of hand and clog up your local repo. :face_with_spiral_eyes:
 
