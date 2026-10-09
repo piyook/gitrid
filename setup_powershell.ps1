@@ -27,12 +27,18 @@ try {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SourceBat = Join-Path $ScriptDir "gitrid.bat"
 $DestinationBat = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\gitrid.bat"
+# PowerShell runs gitrid.ps1 in preference to gitrid.bat, which is left for cmd.
+# A batch file loses the ^ of a pattern such as ^fix/ when PowerShell runs it.
+$SourcePs1 = Join-Path $ScriptDir "gitrid.ps1"
+$DestinationPs1 = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\gitrid.ps1"
 
-# Check if source batch file exists
-if (-not (Test-Path $SourceBat)) {
-    Write-Host "✗ gitrid.bat not found in current directory" -ForegroundColor Red
-    Write-Host "Please run this script from the gitrid directory" -ForegroundColor Red
-    exit 1
+# Check if the source files exist
+foreach ($Source in $SourceBat, $SourcePs1) {
+    if (-not (Test-Path $Source)) {
+        Write-Host "✗ $(Split-Path -Leaf $Source) not found in current directory" -ForegroundColor Red
+        Write-Host "Please run this script from the gitrid directory" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Check if gitrid is already installed
@@ -50,12 +56,14 @@ if (Test-Path $DestinationBat) {
     Write-Host "Installing gitrid for PowerShell..." -ForegroundColor Yellow
 }
 
-# Copy the batch file to WindowsApps directory
+# Copy the batch file and the PowerShell script to WindowsApps directory
 try {
     Copy-Item $SourceBat $DestinationBat -Force
     Write-Host "✓ gitrid.bat copied to $DestinationBat" -ForegroundColor Green
+    Copy-Item $SourcePs1 $DestinationPs1 -Force
+    Write-Host "✓ gitrid.ps1 copied to $DestinationPs1" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Failed to copy gitrid.bat: $_" -ForegroundColor Red
+    Write-Host "✗ Failed to copy the gitrid files: $_" -ForegroundColor Red
     exit 1
 }
 
