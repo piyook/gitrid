@@ -9,7 +9,9 @@ Tidying up a local repo by deleting branches one by one can be a real pain and u
 
 gitrid is a simple bash script that allows you (or your coding agent) to safely delete all branches matching a given pattern in a LOCAL git repository with a single command.
 
-The search pattern automatically excludes protected branches to prevent deleting them by accident: the default branch ('main' or 'master') and 'dev', 'develop' and 'development'. A branch is protected only if its whole name is one of these, so 'feature/device-list' or 'chore/maintenance' can still be deleted. Other protected branches can be added to the EXCEPTIONS variable in the script. The branch you are on is never deleted either.
+The search pattern automatically excludes protected branches to prevent deleting them by accident: the default branch ('main' or 'master') and 'dev', 'develop' and 'development'. A branch is protected only if its whole name is one of these, so 'feature/device-list' or 'chore/maintenance' can still be deleted. Other protected branches can be added to the EXCEPTIONS variable in the script. The branch you are on is never deleted either, nor is a branch checked out in another worktree.
+
+In a repository with no 'main' or 'master', the default branch is the one the remote names as its default ('origin/HEAD', which `git clone` sets). If there is none to be found, gitrid stops with an error and deletes nothing.
 
 This script is easier and safer than using the usual Git command below:
 
@@ -43,6 +45,8 @@ Are you sure? (y/n)
 
 The pattern is a regular expression matched anywhere in the branch name (as `grep -E` does), not a glob: use `feature/`, not `feature/*`, and `^fix/` for branches that start with "fix/".
 
+Only one pattern is taken: for either of two, write `'feat/|fix/'`. A pattern that starts with `-` would be read as an option, so write it as `'[-]123$'`, or put it after `--` (`gitrid --dry-run -- '-123$'`; not in PowerShell, which takes the `--` for itself).
+
 Only local branches are deleted. Remote branches are never touched.
 
 ## Options
@@ -51,7 +55,7 @@ Which branches:
 
 - `--merged` or `-m`: only branches fully MERGED into main (or master). A branch counts as merged if it is merged into your local main or into 'origin/main' as last fetched, so after a pull request is merged on the remote, run `git fetch` and the branch shows as merged without updating your local main first.
 - `--gone` or `-g`: only branches whose upstream branch has been deleted on the remote, as it usually is once a pull request is merged. Run `git fetch --prune` first. This finds squash-merged branches, which `--merged` can not, since their commits are never in main. A gone upstream is not proof of a merge: a remote branch deleted for any other reason looks the same, and a branch that was never pushed is never "gone".
-- `--nuke`: ALL local branches except the protected ones and the one you are on :bomb: :bomb: :boom:
+- `--nuke`: ALL local branches except the protected ones and the one you are on :bomb: :bomb: :boom: It takes no pattern: giving both is an error.
 
 With `--merged` or `--gone` the pattern can be left out, and every branch that passes is taken. Used together, a branch must pass both. Without `--merged`, branches are deleted whether merged or not, so the list shows how many commits each one holds that are on no remote branch and not in main: work that deleting the branch would lose.
 
@@ -140,7 +144,7 @@ Without `--yes`, and with nothing to answer the prompt, gitrid deletes nothing a
 
 To decide for itself what is safe, a script reads `gitrid --list --porcelain` ([above](#listing-branches)): a branch is safe to delete if its status is `merged` or its commits on no remote are `0`.
 
-The setup scripts for Linux, Mac, WSL and Git Bash make `gitrid` an alias in `~/.bashrc`, and a shell that is not interactive does not load aliases. If an agent or script gets "command not found", call the script by its path: `/usr/local/bin/gitrid.sh`, or `~/Scripts/gitrid.sh` in Git Bash. In PowerShell `gitrid` is a batch file on the PATH and works as it is.
+The setup scripts for Linux, Mac, WSL and Git Bash make `gitrid` an alias in `~/.bashrc`, and a shell that is not interactive does not load aliases. If an agent or script gets "command not found", call the script by its path: `/usr/local/bin/gitrid.sh`, or `~/Scripts/gitrid.sh` in Git Bash. In PowerShell `gitrid` is a script on the PATH and works as it is.
 
 The exit code says what happened:
 
@@ -192,7 +196,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 The script will:
 - Check if gitrid is already installed and update it if needed
 - Verify WSL is available and gitrid is installed in WSL
-- Copy the batch file to your Windows user PATH (no admin required)
+- Copy `gitrid.ps1` (which PowerShell runs) and `gitrid.bat` (for cmd) to your Windows user PATH (no admin required)
+
+In cmd, put a pattern that has a `^` in double quotes, `gitrid "^fix/"`, or cmd drops the `^`. PowerShell needs nothing special.
 
 2. Check it works:
 
