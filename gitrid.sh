@@ -9,10 +9,41 @@ EXIT_ERROR=1      # Bad usage, not a git repository, no answer to the prompt, or
 EXIT_NO_MATCH=2   # No branch matched, so there was nothing to delete
 EXIT_CANCELLED=3  # The answer to "Are you sure?" was not yes
 
-# Verify the main branch name
-DEFAULT_BRANCH="main"
-if ! git rev-parse --verify "refs/heads/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-    DEFAULT_BRANCH="master"  # Fallback to 'master' if 'main' doesn't exist
+ref_exists() {
+    git rev-parse --verify --quiet "$1" >/dev/null 2>&1
+}
+
+# The default branch: a local 'main' or 'master', else the branch the remote
+# calls its default (origin/HEAD, which a clone sets), else a 'main' or
+# 'master' that is only on the remote. Prints nothing if there is none.
+find_default_branch() {
+    local name
+    for name in main master; do
+        if ref_exists "refs/heads/$name"; then
+            echo "$name"
+            return
+        fi
+    done
+    name=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+    if [ -n "$name" ]; then
+        echo "${name#origin/}"
+        return
+    fi
+    for name in main master; do
+        if ref_exists "refs/remotes/origin/$name"; then
+            echo "$name"
+            return
+        fi
+    done
+}
+
+# With no default branch found nothing is deleted (see below); 'main' is then
+# only a name for the help text
+DEFAULT_BRANCH=$(find_default_branch)
+DEFAULT_BRANCH_FOUND=true
+if [ -z "$DEFAULT_BRANCH" ]; then
+    DEFAULT_BRANCH="main"
+    DEFAULT_BRANCH_FOUND=false
 fi
 
 # Define branches to exclude from deletion. A branch is protected only if its
@@ -23,11 +54,18 @@ EXCEPTIONS="$DEFAULT_BRANCH|dev|develop|development"
 # branch and, if there is one, the remote's copy of it as last fetched. After a
 # pull request is merged on the remote the local default branch is often
 # behind, so checking it alone would report the merged branch as unmerged.
-MERGE_TARGETS=("$DEFAULT_BRANCH")
-MERGED_INTO="'$DEFAULT_BRANCH'"
-if git rev-parse --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-    MERGE_TARGETS+=("origin/$DEFAULT_BRANCH")
-    MERGED_INTO="$MERGED_INTO or 'origin/$DEFAULT_BRANCH'"
+MERGE_TARGETS=()
+MERGED_INTO=""
+if ref_exists "refs/heads/$DEFAULT_BRANCH"; then
+    MERGE_TARGETS+=("refs/heads/$DEFAULT_BRANCH")
+    MERGED_INTO="'$DEFAULT_BRANCH'"
+fi
+if ref_exists "refs/remotes/origin/$DEFAULT_BRANCH"; then
+    MERGE_TARGETS+=("refs/remotes/origin/$DEFAULT_BRANCH")
+    MERGED_INTO="${MERGED_INTO:+$MERGED_INTO or }'origin/$DEFAULT_BRANCH'"
+fi
+if [ -z "$MERGED_INTO" ]; then
+    MERGED_INTO="'$DEFAULT_BRANCH'"
 fi
 
 # All local branches, one name per line
@@ -48,6 +86,12 @@ merged_branches() {
 gone_branches() {
     git for-each-ref --format="%(refname:short)%09%(upstream:track)" refs/heads/ |
         awk -F'\t' '$2 == "[gone]" { print $1 }'
+}
+
+# Local branches checked out in a worktree, this one or another. Git refuses
+# to delete them.
+checked_out_branches() {
+    git worktree list --porcelain | sed -n 's|^branch refs/heads/||p'
 }
 
 # Where a branch stands with its upstream: 'none' (it has no upstream),
@@ -71,7 +115,7 @@ upstream_state() {
 # its commits here too, since git can't tell they are in the default branch.
 local_only_count() {
     local kept=(--remotes)
-    if git rev-parse --verify --quiet "refs/heads/$DEFAULT_BRANCH" >/dev/null 2>&1; then
+    if ref_exists "refs/heads/$DEFAULT_BRANCH"; then
         kept+=("refs/heads/$DEFAULT_BRANCH")
     fi
     git rev-list --count "refs/heads/$1" --not "${kept[@]}" 2>/dev/null || echo 0
@@ -89,7 +133,7 @@ local_only_words() {
 show_help() {
     cat <<EOF
 
-Usage: gitrid [options] <pattern>
+Usage: gitrid [options] [--] <pattern>
        gitrid --list [--porcelain]
 
 Deletes the LOCAL branches whose name matches <pattern>, after listing them
@@ -97,9 +141,12 @@ and asking "Are you sure?". Remote branches are never touched.
 
 <pattern> is a regular expression (as for 'grep -E') matched anywhere in the
 branch name, not a glob: 'feature/' matches every branch with 'feature/' in
-its name, '^fix/' those that start with 'fix/'.
+its name, '^fix/' those that start with 'fix/'. Only one pattern is taken:
+for either of two, 'feat/|fix/'. A pattern that starts with '-' is written
+'[-]...' or put after '--', so that it is not read as an option.
 
-Never deleted: the branch you are on, and the branches named exactly
+Never deleted: the branch you are on, a branch checked out in another
+worktree, and the branches named exactly
 $EXCEPTIONS.
 
 Which branches:
@@ -110,7 +157,7 @@ Which branches:
                   Run 'git fetch --prune' first. Finds squash-merged branches,
                   which --merged can not.
   --nuke          Every branch, whatever its name. With --merged or --gone,
-                  every branch that passes them.
+                  every branch that passes them. Takes no pattern.
   With --merged or --gone the pattern can be left out: all that pass are taken.
   Without --merged, branches are deleted whether merged or not, so work that
   was never pushed is lost. The list shows how many commits each branch holds
@@ -159,38 +206,63 @@ PORCELAIN=false
 DRY_RUN=false
 ASSUME_YES=false
 PATTERN=""
+PATTERN_GIVEN=false
+OPTIONS_ENDED=false
 
-# Parse arguments dynamically (options can come before or after the pattern)
+# Parse arguments dynamically (options can come before or after the pattern).
+# After '--' nothing is read as an option, for a pattern that starts with '-'.
 for arg in "$@"; do
-    case "$arg" in
-        --merged|-m) MERGED=true ;;
-        --gone|-g) GONE=true ;;
-        --nuke) NUKE=true ;;
-        --dry-run|-n) DRY_RUN=true ;;
-        --yes|-y) ASSUME_YES=true ;;
-        --list|-l) LIST_MODE=true ;;
-        --porcelain) PORCELAIN=true ;;
-        --help|-h)
-            show_help
-            exit $EXIT_OK
-            ;;
-        --version)
-            echo "gitrid version $VERSION"
-            exit $EXIT_OK
-            ;;
-        -*)
-            echo "" >&2
-            echo "Error: Unknown command '$arg'" >&2
-            echo "" >&2
-            echo "Run 'gitrid --help' for the commands and what they do." >&2
-            exit $EXIT_ERROR
-            ;;
-        *) PATTERN="$arg" ;;
-    esac
+    if [ "$OPTIONS_ENDED" = false ]; then
+        case "$arg" in
+            --merged|-m) MERGED=true; continue ;;
+            --gone|-g) GONE=true; continue ;;
+            --nuke) NUKE=true; continue ;;
+            --dry-run|-n) DRY_RUN=true; continue ;;
+            --yes|-y) ASSUME_YES=true; continue ;;
+            --list|-l) LIST_MODE=true; continue ;;
+            --porcelain) PORCELAIN=true; continue ;;
+            --) OPTIONS_ENDED=true; continue ;;
+            --help|-h)
+                show_help
+                exit $EXIT_OK
+                ;;
+            --version)
+                echo "gitrid version $VERSION"
+                exit $EXIT_OK
+                ;;
+            -*)
+                echo "" >&2
+                echo "Error: Unknown command '$arg'" >&2
+                echo "" >&2
+                echo "A pattern that starts with '-' is written '[-]...' or put after '--'." >&2
+                echo "Run 'gitrid --help' for the commands and what they do." >&2
+                exit $EXIT_ERROR
+                ;;
+        esac
+    fi
+
+    # A second pattern would replace the first without a word, and the
+    # branches deleted would not be the ones asked for
+    if [ "$PATTERN_GIVEN" = true ]; then
+        echo "Error: two patterns given ('$PATTERN' and '$arg'), and only one is taken." >&2
+        echo "To match either of them use one pattern: '$PATTERN|$arg'" >&2
+        exit $EXIT_ERROR
+    fi
+    PATTERN="$arg"
+    PATTERN_GIVEN=true
 done
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
     echo "Error: not inside a git repository." >&2
+    exit $EXIT_ERROR
+fi
+
+# Without a default branch there is nothing to protect and nothing to judge
+# "merged" against, so stop here
+if [ "$DEFAULT_BRANCH_FOUND" != true ]; then
+    echo "Error: can't tell which branch is the default one: there is no 'main' or 'master'," >&2
+    echo "and the remote's default branch ('origin/HEAD') is not set." >&2
+    echo "If the repository has a remote, run: git remote set-head origin --auto" >&2
     exit $EXIT_ERROR
 fi
 
@@ -252,6 +324,11 @@ if [ "$LIST_MODE" = true ]; then
 fi
 
 if [ "$NUKE" = true ]; then
+    if [ "$PATTERN_GIVEN" = true ]; then
+        echo "Error: --nuke takes every branch, so it can't be given a pattern ('$PATTERN')." >&2
+        echo "Use the pattern or --nuke, not both." >&2
+        exit $EXIT_ERROR
+    fi
     PATTERN=".*"
 fi
 
@@ -263,7 +340,7 @@ fi
 # Ensure a pattern is provided
 if [ -z "$PATTERN" ]; then
     echo "" >&2
-    echo "Usage: gitrid [options] <pattern>" >&2
+    echo "Usage: gitrid [options] [--] <pattern>" >&2
     echo "" >&2
     echo "Give a pattern (a regular expression matched in the branch name)," >&2
     echo "or one of --merged, --gone or --nuke." >&2
@@ -287,12 +364,20 @@ if [ "$GONE" = true ]; then
 fi
 LOCAL_BRANCHES=$(echo "$CANDIDATES" | grep -E -- "$PATTERN" | grep -Evx -- "($EXCEPTIONS)")
 
-# Git can't delete the branch that is checked out, so leave it out and say so
+# Git can't delete a branch that is checked out, here or in another worktree,
+# so leave those out and say so
 CURRENT_BRANCH=$(git branch --show-current)
-if [ -n "$CURRENT_BRANCH" ] && echo "$LOCAL_BRANCHES" | grep -Fxq -- "$CURRENT_BRANCH"; then
-    echo "Skipping '$CURRENT_BRANCH': it is the current branch."
-    LOCAL_BRANCHES=$(echo "$LOCAL_BRANCHES" | grep -Fvx -- "$CURRENT_BRANCH")
-fi
+while IFS= read -r branch; do
+    [ -z "$branch" ] && continue
+    if echo "$LOCAL_BRANCHES" | grep -Fxq -- "$branch"; then
+        if [ "$branch" = "$CURRENT_BRANCH" ]; then
+            echo "Skipping '$branch': it is the current branch."
+        else
+            echo "Skipping '$branch': it is checked out in another worktree."
+        fi
+        LOCAL_BRANCHES=$(echo "$LOCAL_BRANCHES" | grep -Fvx -- "$branch")
+    fi
+done <<< "$(checked_out_branches)"
 
 # Check if any branches match the pattern
 if [ -z "$LOCAL_BRANCHES" ]; then
@@ -342,13 +427,22 @@ if [ "$ASSUME_YES" != true ]; then
         exit $EXIT_ERROR
     fi
 
+    # An answer piped in from PowerShell or cmd ends with a carriage return
+    CONFIRM="${CONFIRM%$'\r'}"
+
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
         echo "Deletion cancelled."
         exit $EXIT_CANCELLED
     fi
 fi
 
-if echo "$LOCAL_BRANCHES" | xargs git branch -D --; then
+# An array, not xargs, which would trip on a quote in a branch name
+TO_DELETE=()
+while IFS= read -r branch; do
+    TO_DELETE+=("$branch")
+done <<< "$LOCAL_BRANCHES"
+
+if git branch -D -- "${TO_DELETE[@]}"; then
     echo "Local branches deleted."
     exit $EXIT_OK
 fi

@@ -6,7 +6,8 @@
 
 - Deletes local branches only, with `git branch -D`. It never deletes or changes a remote branch, never fetches, never pushes and never switches branch.
 - Run it inside the repository to tidy. Outside one it exits `1`.
-- Never deleted: the current branch (skipped with a message), and branches named exactly `main` (or `master` when there is no local `main`), `dev`, `develop`, `development`. Matching is on the whole name: `feature/device-list` is not protected.
+- Never deleted: the current branch and any branch checked out in another worktree (each skipped with a message), and branches named exactly `dev`, `develop`, `development` or the default branch. Matching is on the whole name: `feature/device-list` is not protected.
+- The default branch is a local `main`, else a local `master`, else the branch `origin/HEAD` points to, else a `main` or `master` that is only on the remote. With none of these gitrid deletes nothing and exits `1`; if the repository has a remote, `git remote set-head origin --auto` sets `origin/HEAD`.
 - Deleting is permanent as far as gitrid goes (the commits can still be found with `git reflog` for a while). A branch without `--merged` is deleted whether its work is merged or not.
 
 ## The safe way to run it (agents and scripts)
@@ -31,7 +32,7 @@ Without `--yes` gitrid asks "Are you sure? (y/n)" on stdin. With no terminal and
 | `gitrid <pattern>` | Delete branches whose name matches `<pattern>`, merged or not |
 | `gitrid --merged [<pattern>]`, `-m` | Only branches fully merged into local `main` or `origin/main` |
 | `gitrid --gone [<pattern>]`, `-g` | Only branches whose upstream branch was deleted on the remote |
-| `gitrid --nuke` | Every branch that is not protected. With `--merged` or `--gone`: every branch that passes them |
+| `gitrid --nuke` | Every branch that is not protected. With `--merged` or `--gone`: every branch that passes them. Takes no pattern: `--nuke` with a pattern is an error |
 | `--dry-run`, `-n` | With any of the above: list what would be deleted, then stop |
 | `--yes`, `-y` | With any of the above: delete without asking |
 | `gitrid --list`, `-l` | List every local branch with its status. Read-only |
@@ -40,7 +41,9 @@ Without `--yes` gitrid asks "Are you sure? (y/n)" on stdin. With no terminal and
 | `gitrid --help`, `-h` | Usage |
 
 - Options can come before or after the pattern. An option that is not listed is an error (exit `1`).
-- `<pattern>` is an extended regular expression (`grep -E`) matched anywhere in the branch name. It is not a glob: use `feature/`, not `feature/*`; anchor with `^fix/` or `-123$`. Quote it in the shell.
+- `<pattern>` is an extended regular expression (`grep -E`) matched anywhere in the branch name. It is not a glob: use `feature/`, not `feature/*`; anchor with `^fix/` or `123$`. Quote it in the shell.
+- Only one pattern is taken; a second is an error (exit `1`). For either of two use alternation: `'feat/|fix/'`.
+- A pattern that starts with `-` would be read as an option. Write it as `'[-]123$'`, which works everywhere, or put it after `--` (`gitrid --dry-run -- '-123$'`), which does not work from PowerShell.
 - With `--merged` or `--gone` the pattern is optional; left out, every branch that passes is taken. With neither, a pattern (or `--nuke`) is required.
 - `--merged` and `--gone` together: a branch must pass both.
 
@@ -112,4 +115,4 @@ gitrid --list --porcelain | awk -F'\t' '$1 != "protected" && ($1 == "merged" || 
 
 ## Installed copies
 
-On Windows the PowerShell command is a batch file that runs the script in WSL (`wsl /usr/local/bin/gitrid.sh`); Git Bash uses an alias to `~/Scripts/gitrid.sh`, and aliases are not loaded in a non-interactive shell, so a script there calls `~/Scripts/gitrid.sh` by path. Linux, macOS and WSL use `/usr/local/bin/gitrid.sh`. The copies are updated separately, by rerunning the setup script for each.
+On Windows the PowerShell command is `gitrid.ps1`, which runs the script in WSL (`wsl --exec /usr/local/bin/gitrid.sh`) and passes the pattern through unchanged. cmd uses `gitrid.bat`, where a pattern with a `^` must be in double quotes (`gitrid "^fix/"`) or cmd drops the `^`. Git Bash uses an alias to `~/Scripts/gitrid.sh`, and aliases are not loaded in a non-interactive shell, so a script there calls `~/Scripts/gitrid.sh` by path. Linux, macOS and WSL use `/usr/local/bin/gitrid.sh`. The copies are updated separately, by rerunning the setup script for each.

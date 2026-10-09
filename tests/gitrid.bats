@@ -270,6 +270,46 @@ branch_count() {
     [ "$output" = "$before" ]
 }
 
+@test "a pattern that starts with a dash goes after -- or is written [-]" {
+    run gitrid --dry-run -- '-123$'
+    assert_status 0
+    assert_listed bugfix/issue-123
+
+    run gitrid '[-]123$' --dry-run
+    assert_status 0
+    assert_listed bugfix/issue-123
+
+    run gitrid '-123$' --dry-run
+    assert_status 1
+    assert_output_has "put after '--'"
+}
+
+@test "a second pattern is an error, not a replacement for the first" {
+    run gitrid feature/ bugfix/ --yes
+    assert_status 1
+    assert_output_has "two patterns given ('feature/' and 'bugfix/')"
+    [ "$(branch_count)" -eq 8 ]
+}
+
+@test "--nuke with a pattern is an error, whichever comes first" {
+    run gitrid --nuke feature/ --yes
+    assert_status 1
+    assert_output_has "--nuke takes every branch"
+
+    run gitrid feature/ --nuke --yes
+    assert_status 1
+    [ "$(branch_count)" -eq 8 ]
+}
+
+@test "--merged is judged against origin/main when there is no local main" {
+    git checkout -q dev
+    git branch -q -D main
+    run gitrid --merged --dry-run
+    assert_status 0
+    assert_listed chore/fresh feature/remote-merged
+    assert_output_has "fully merged into 'origin/main'"
+}
+
 # --- protected branches ----------------------------------------------------
 
 @test "a branch is protected only if its whole name is a protected name" {
@@ -311,6 +351,59 @@ branch_count() {
     assert_status 0
     assert_branch master
     refute_branch feature/x
+}
+
+@test "a branch checked out in another worktree is skipped, with a message" {
+    git worktree add -q "$BATS_TEST_TMPDIR/other" feature/payment
+    run gitrid feature/ --yes
+    assert_status 0
+    assert_output_has "Skipping 'feature/payment': it is checked out in another worktree."
+    assert_branch feature/payment
+    refute_branch feature/login
+    refute_branch feature/device-list
+}
+
+@test "the remote's default branch is protected when there is no main or master" {
+    mkdir "$BATS_TEST_TMPDIR/trunk"
+    cd "$BATS_TEST_TMPDIR/trunk"
+    git init -q --bare -b trunk remote.git
+    git init -q -b trunk work
+    cd work
+    git remote add origin ../remote.git
+    git commit -q --allow-empty -m "init"
+    git push -q -u origin trunk
+    git remote set-head origin trunk
+    git branch feature/merged
+    git checkout -q -b feature/x
+    git commit -q --allow-empty -m "x"
+
+    run gitrid --list --porcelain
+    assert_status 0
+    assert_output_has "$(printf 'protected\ttrunk')"
+    assert_output_has "$(printf 'merged\tfeature/merged')"
+    assert_output_has "$(printf 'unmerged\tfeature/x')"
+
+    # trunk is not the current branch here, so only its name protects it
+    run gitrid --nuke --yes
+    assert_status 0
+    assert_branch trunk
+    refute_branch feature/merged
+}
+
+@test "with no default branch to be found it deletes nothing and exits 1" {
+    mkdir "$BATS_TEST_TMPDIR/local"
+    cd "$BATS_TEST_TMPDIR/local"
+    git init -q -b trunk
+    git commit -q --allow-empty -m "init"
+    git branch feature/x
+
+    run gitrid --nuke --yes
+    assert_status 1
+    assert_output_has "can't tell which branch is the default one"
+    assert_branch feature/x
+
+    run gitrid --list
+    assert_status 1
 }
 
 # --- work at risk ----------------------------------------------------------
@@ -363,6 +456,20 @@ branch_count() {
     assert_branch feature/payment
 }
 
+@test "an answer that ends with a carriage return, as from PowerShell, is read" {
+    run bash -c 'printf "y\r\n" | bash "$1" --merged' _ "$GITRID"
+    assert_status 0
+    refute_branch feature/login
+}
+
+@test "a branch with a quote in its name can be deleted" {
+    git branch "fix/it's"
+    run gitrid "it's" --yes
+    assert_status 0
+    refute_branch "fix/it's"
+    [ "$(branch_count)" -eq 8 ]
+}
+
 @test "answering anything else cancels with exit code 3" {
     run bash -c 'echo n | bash "$1" feature/' _ "$GITRID"
     assert_status 3
@@ -398,7 +505,7 @@ branch_count() {
 @test "no pattern and no option is an error" {
     run gitrid
     assert_status 1
-    assert_output_has "Usage: gitrid [options] <pattern>"
+    assert_output_has "Usage: gitrid [options] [--] <pattern>"
 }
 
 @test "an unknown option is an error" {
@@ -420,12 +527,12 @@ branch_count() {
 @test "--help and -h show the usage" {
     run gitrid --help
     assert_status 0
-    assert_output_has "Usage: gitrid [options] <pattern>"
+    assert_output_has "Usage: gitrid [options] [--] <pattern>"
     assert_output_has "Exit codes:"
 
     run gitrid -h
     assert_status 0
-    assert_output_has "Usage: gitrid [options] <pattern>"
+    assert_output_has "Usage: gitrid [options] [--] <pattern>"
 }
 
 @test "--version shows the version in the script" {
