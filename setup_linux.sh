@@ -4,6 +4,8 @@
 # Define the source script and destination
 SOURCE_SCRIPT="gitrid.sh"
 DESTINATION="/usr/local/bin/gitrid.sh"
+# The 'gitrid' command, a link to the script
+COMMAND="/usr/local/bin/gitrid"
 
 # Ensure the script is executable
 chmod +x "$SOURCE_SCRIPT"
@@ -13,15 +15,14 @@ chmod +x "$SOURCE_SCRIPT"
 if [ -f "$DESTINATION" ]; then
     sudo rm -f "$DESTINATION"
 fi
-sudo cp "$SOURCE_SCRIPT" "$DESTINATION"
+sudo cp "$SOURCE_SCRIPT" "$DESTINATION" || exit 1
 
 
 echo "Scripts successfully installed to $DESTINATION"
 
-# Create an alias for easy access
-if ! grep -q "alias gitrid" ~/.bashrc; then
-    echo "alias gitrid=$DESTINATION" >> ~/.bashrc
-    echo "Alias 'gitrid' added to ~/.bashrc"
-else
-    echo "Alias 'gitrid' already exists in ~/.bashrc"
-fi
+# Make 'gitrid' a command on the PATH. An alias in ~/.bashrc is not enough: a
+# shell that is not interactive (a script, a hook, an AI agent) does not load
+# aliases.
+sudo ln -sf "$DESTINATION" "$COMMAND" || exit 1
+
+echo "Command 'gitrid' installed to $COMMAND"

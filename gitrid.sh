@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Version information
-VERSION="3.1.0"
+VERSION="3.1.1"
 
 # Exit codes, so a script or an AI agent can tell the outcomes apart
 EXIT_OK=0         # Branches deleted, or a list, dry run, help or version shown
