@@ -94,6 +94,11 @@ with_home_bin() {
     command -v cygpath > /dev/null || skip "Windows only"
     command -v pwsh > /dev/null || skip "PowerShell is not installed"
     bash setup_gitbash.sh
+    # A repository of its own: the checkout the tests run in may have no main
+    git init -q -b main "$BATS_TEST_TMPDIR/repo"
+    cd "$BATS_TEST_TMPDIR/repo"
+    git -c user.name="gitrid tests" -c user.email="tests@example.com" \
+        commit -q --allow-empty -m "init"
     run with_home_bin pwsh -NoProfile -Command 'gitrid "^no-such|branch$" --dry-run; exit $LASTEXITCODE'
     [ "$status" -eq 2 ]
     [[ "$output" == *'^no-such|branch$'* ]]
