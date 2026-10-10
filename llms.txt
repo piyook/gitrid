@@ -1,6 +1,6 @@
 # gitrid
 
-> A bash script that deletes LOCAL git branches in bulk: by name pattern, by "merged into main", or by "upstream branch gone". Describes gitrid 3.1.1 (`gitrid --version`). This file is the reference for AI agents and scripts; `README.md` is the human guide. `gitrid --help` prints a short version of the same rules.
+> A bash script that deletes LOCAL git branches in bulk: by name pattern, by "merged into main", or by "upstream branch gone". Describes gitrid 3.1.2 (`gitrid --version`). This file is the reference for AI agents and scripts; `README.md` is the human guide. `gitrid --help` prints a short version of the same rules.
 
 ## What it does and does not do
 
@@ -37,7 +37,7 @@ Without `--yes` gitrid asks "Are you sure? (y/n)" on stdin. With no terminal and
 | `--yes`, `-y` | With any of the above: delete without asking |
 | `gitrid --list`, `-l` | List every local branch with its status. Read-only |
 | `gitrid --list --porcelain` | The same list in a fixed format for a program to read |
-| `gitrid --version` | `gitrid version 3.1.1` |
+| `gitrid --version` | `gitrid version 3.1.2` |
 | `gitrid --help`, `-h` | Usage |
 
 - Options can come before or after the pattern. An option that is not listed is an error (exit `1`).
@@ -115,4 +115,4 @@ gitrid --list --porcelain | awk -F'\t' '$1 != "protected" && ($1 == "merged" || 
 
 ## Installed copies
 
-On Windows the PowerShell command is `gitrid.ps1`, which runs the script in WSL (`wsl --exec /usr/local/bin/gitrid.sh`) and passes the pattern through unchanged. cmd uses `gitrid.bat`, where a pattern with a `^` must be in double quotes (`gitrid "^fix/"`) or cmd drops the `^`. In Git Bash `gitrid` is `~/bin/gitrid`, a wrapper that runs `~/Scripts/gitrid.sh`. On Linux, macOS and WSL it is `/usr/local/bin/gitrid`, a link to `/usr/local/bin/gitrid.sh`. Both are commands on the PATH, so `gitrid` works in a non-interactive shell. An installation made by an older setup script has only an alias in `~/.bashrc`, which a non-interactive shell does not load: there, call the script by its path (`~/Scripts/gitrid.sh` or `/usr/local/bin/gitrid.sh`) or rerun the setup script. The copies are updated separately, by rerunning the setup script for each.
+On Windows the PowerShell command is `gitrid.ps1`, which runs the script in WSL (`wsl --exec /usr/local/bin/gitrid.sh`) and passes the pattern through unchanged. cmd uses `gitrid.bat`, where a pattern with a `^` must be in double quotes (`gitrid "^fix/"`) or cmd drops the `^`. In Git Bash `gitrid` is `~/bin/gitrid`, a wrapper that runs `~/Scripts/gitrid.sh`. Next to it is `~/bin/gitrid.ps1`, which a PowerShell with `~/bin` on its PATH runs, and which runs the same script in Git Bash; installations of 3.1.1 lack it, and there `gitrid` in such a PowerShell does nothing and prints nothing. On Linux, macOS and WSL it is `/usr/local/bin/gitrid`, a link to `/usr/local/bin/gitrid.sh`. Both are commands on the PATH, so `gitrid` works in a non-interactive shell. An installation made by an older setup script has only an alias in `~/.bashrc`, which a non-interactive shell does not load: there, call the script by its path (`~/Scripts/gitrid.sh` or `/usr/local/bin/gitrid.sh`) or rerun the setup script. The copies are updated separately, by rerunning the setup script for each.
