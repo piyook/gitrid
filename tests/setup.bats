@@ -68,3 +68,33 @@ with_home_bin() {
     run with_home_bin bash setup_gitbash.sh
     [[ "$output" != *"open a new Git Bash window"* ]]
 }
+
+# Windows only: a PowerShell that has ~/bin on its PATH finds the wrapper, which
+# it can not run, so setup_gitbash.sh puts a gitrid.ps1 next to it.
+
+@test "setup_gitbash.sh writes gitrid.ps1 next to the command on Windows only" {
+    bash setup_gitbash.sh
+    if command -v cygpath > /dev/null; then
+        [ -f "$HOME/bin/gitrid.ps1" ]
+    else
+        [ ! -e "$HOME/bin/gitrid.ps1" ]
+    fi
+}
+
+@test "PowerShell with ~/bin on its PATH runs the installed script" {
+    command -v cygpath > /dev/null || skip "Windows only"
+    command -v pwsh > /dev/null || skip "PowerShell is not installed"
+    bash setup_gitbash.sh
+    run with_home_bin pwsh -NoProfile -Command 'gitrid --version; exit $LASTEXITCODE'
+    [ "$status" -eq 0 ]
+    [ "${output%$'\r'}" = "$(bash gitrid.sh --version)" ]
+}
+
+@test "from PowerShell the pattern is passed as typed and the exit code comes back" {
+    command -v cygpath > /dev/null || skip "Windows only"
+    command -v pwsh > /dev/null || skip "PowerShell is not installed"
+    bash setup_gitbash.sh
+    run with_home_bin pwsh -NoProfile -Command 'gitrid "^no-such|branch$" --dry-run; exit $LASTEXITCODE'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *'^no-such|branch$'* ]]
+}
