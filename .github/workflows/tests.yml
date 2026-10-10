@@ -31,3 +31,10 @@ jobs:
           persist-credentials: false
       - name: Run the tests
         run: npx --yes bats@1.11.0 tests
+      # A shell that is not interactive loads no aliases: gitrid must be a
+      # command on the PATH
+      - name: Install with setup_linux.sh and check gitrid is on the PATH
+        run: |
+          bash setup_linux.sh
+          bash -c 'command -v gitrid'
+          [ "$(bash -c 'gitrid --version')" = "$(bash gitrid.sh --version)" ]

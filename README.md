@@ -144,7 +144,7 @@ Without `--yes`, and with nothing to answer the prompt, gitrid deletes nothing a
 
 To decide for itself what is safe, a script reads `gitrid --list --porcelain` ([above](#listing-branches)): a branch is safe to delete if its status is `merged` or its commits on no remote are `0`.
 
-The setup scripts for Linux, Mac, WSL and Git Bash make `gitrid` an alias in `~/.bashrc`, and a shell that is not interactive does not load aliases. If an agent or script gets "command not found", call the script by its path: `/usr/local/bin/gitrid.sh`, or `~/Scripts/gitrid.sh` in Git Bash. In PowerShell `gitrid` is a script on the PATH and works as it is.
+The setup scripts make `gitrid` a command on the PATH, so it works in a shell that is not interactive (a script, a hook, an agent) as it does at the prompt. Versions before this one made it an alias in `~/.bashrc`, which such a shell does not load: if an agent or script gets "command not found", run the setup script again.
 
 The exit code says what happened:
 
@@ -169,13 +169,11 @@ To install gitrid, simply run the appropriate setup script for your system. The 
 bash setup_linux.sh
 ```
 
-If gitrid is already installed, the script replaces it with this version.
+This copies the script to `/usr/local/bin/gitrid.sh` and makes `/usr/local/bin/gitrid` a link to it. If gitrid is already installed, the script replaces it with this version.
 
 2. Check it works:
 
 ```bash
-source ~/.bashrc
-
 gitrid --help
 ```
 
@@ -214,13 +212,13 @@ gitrid --help
 bash setup_gitbash.sh
 ```
 
-This creates a Scripts directory in the user's home directory (if one doesn't already exist) and copies the gitrid.sh script into it, makes it executable and adds an alias for easy access. The script will detect existing installations and update them automatically.
+This creates a Scripts directory in the user's home directory (if one doesn't already exist), copies the gitrid.sh script into it and makes it executable. It then writes the `gitrid` command to `~/bin/gitrid`, a small script that runs `~/Scripts/gitrid.sh`. Run it again to update an existing installation.
+
+Git Bash puts `~/bin` on the PATH when the folder exists. If the setup script had to create it, open a new Git Bash window before using `gitrid`.
 
 2. Check it works:
 
 ```bash
-source ~/.bashrc
-
 gitrid --help
 ```
 
