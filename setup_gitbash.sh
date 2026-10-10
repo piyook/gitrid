@@ -36,6 +36,31 @@ chmod +x "$COMMAND"
 
 echo "Command 'gitrid' installed to $COMMAND"
 
+# A PowerShell that has ~/bin on its PATH (one started from Git Bash, say) finds
+# the wrapper above before the gitrid.ps1 of the PowerShell setup. It can not
+# run a file with no extension, and does nothing. With a gitrid.ps1 next to the
+# wrapper, PowerShell runs that. It names Git's bin\bash.exe in full: a plain
+# 'bash' in PowerShell can be the one of WSL, and usr\bin\bash.exe does not put
+# grep and the rest on the PATH.
+if command -v cygpath > /dev/null; then
+    GIT_BASH="$(cygpath -w /)bin\\bash.exe"
+    if [ -f "$GIT_BASH" ]; then
+        # The path goes in a single-quoted PowerShell string: double any quote
+        cat > "$COMMAND.ps1" <<EOF || exit 1
+# Runs gitrid in Git Bash from PowerShell. Written by setup_gitbash.sh.
+\$bash = '${GIT_BASH//\'/\'\'}'
+\$script = Join-Path \$PSScriptRoot '..\\Scripts\\gitrid.sh'
+if (\$MyInvocation.ExpectingInput) {
+    \$input | & \$bash \$script @args
+} else {
+    & \$bash \$script @args
+}
+exit \$LASTEXITCODE
+EOF
+        echo "PowerShell command installed to $COMMAND.ps1"
+    fi
+fi
+
 case ":$PATH:" in
     *":$HOME/bin:"*) ;;
     *) echo "$HOME/bin is not on the PATH of this shell: open a new Git Bash window to use 'gitrid'" ;;

@@ -216,6 +216,8 @@ This creates a Scripts directory in the user's home directory (if one doesn't al
 
 Git Bash puts `~/bin` on the PATH when the folder exists. If the setup script had to create it, open a new Git Bash window before using `gitrid`.
 
+It also writes `~/bin/gitrid.ps1`, which runs the same script in Git Bash. This is for a PowerShell that has `~/bin` on its PATH, such as one started from Git Bash: it finds `~/bin/gitrid` first and can not run a file with no extension.
+
 2. Check it works:
 
 ```bash
