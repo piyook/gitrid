@@ -1,6 +1,6 @@
 # gitrid
 
-> A bash script that deletes LOCAL git branches in bulk: by name pattern, by "merged into main", or by "upstream branch gone". Describes gitrid 3.1.0 (`gitrid --version`). This file is the reference for AI agents and scripts; `README.md` is the human guide. `gitrid --help` prints a short version of the same rules.
+> A bash script that deletes LOCAL git branches in bulk: by name pattern, by "merged into main", or by "upstream branch gone". Describes gitrid 3.1.1 (`gitrid --version`). This file is the reference for AI agents and scripts; `README.md` is the human guide. `gitrid --help` prints a short version of the same rules.
 
 ## What it does and does not do
 
@@ -37,7 +37,7 @@ Without `--yes` gitrid asks "Are you sure? (y/n)" on stdin. With no terminal and
 | `--yes`, `-y` | With any of the above: delete without asking |
 | `gitrid --list`, `-l` | List every local branch with its status. Read-only |
 | `gitrid --list --porcelain` | The same list in a fixed format for a program to read |
-| `gitrid --version` | `gitrid version 3.1.0` |
+| `gitrid --version` | `gitrid version 3.1.1` |
 | `gitrid --help`, `-h` | Usage |
 
 - Options can come before or after the pattern. An option that is not listed is an error (exit `1`).

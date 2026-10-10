@@ -144,7 +144,7 @@ Without `--yes`, and with nothing to answer the prompt, gitrid deletes nothing a
 
 To decide for itself what is safe, a script reads `gitrid --list --porcelain` ([above](#listing-branches)): a branch is safe to delete if its status is `merged` or its commits on no remote are `0`.
 
-The setup scripts make `gitrid` a command on the PATH, so it works in a shell that is not interactive (a script, a hook, an agent) as it does at the prompt. Versions before this one made it an alias in `~/.bashrc`, which such a shell does not load: if an agent or script gets "command not found", run the setup script again.
+The setup scripts make `gitrid` a command on the PATH, so it works in a shell that is not interactive (a script, a hook, an agent) as it does at the prompt. Versions before 3.1.1 made it an alias in `~/.bashrc`, which such a shell does not load: if an agent or script gets "command not found", run the setup script again.
 
 The exit code says what happened:
 
