@@ -23,17 +23,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # On Windows this is Git Bash, where the tests also run the gitrid.ps1
+      # that setup_gitbash.sh writes for PowerShell
       - name: Run the tests
+        shell: bash
         run: npx --yes bats@1.11.0 tests
       # A shell that is not interactive loads no aliases: gitrid must be a
       # command on the PATH
       - name: Install with setup_linux.sh and check gitrid is on the PATH
+        if: runner.os != 'Windows'
         run: |
           bash setup_linux.sh
           bash -c 'command -v gitrid'
