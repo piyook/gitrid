@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Version information
-VERSION="3.1.2"
+VERSION="3.2.0"
 
 # Exit codes, so a script or an AI agent can tell the outcomes apart
 EXIT_OK=0         # Branches deleted, or a list, dry run, help or version shown
@@ -46,27 +46,119 @@ if [ -z "$DEFAULT_BRANCH" ]; then
     DEFAULT_BRANCH_FOUND=false
 fi
 
-# Define branches to exclude from deletion. A branch is protected only if its
-# whole name is one of these, so 'feature/device' is not protected by 'dev'.
-EXCEPTIONS="$DEFAULT_BRANCH|dev|develop|development"
+# The words given joined as "'a'", "'a' or 'b'" or "'a', 'b' or 'c'"
+or_list() {
+    local words="" i
+    for ((i = 1; i <= $#; i++)); do
+        if [ "$i" -eq 1 ]; then
+            words="'${!i}'"
+        elif [ "$i" -eq $# ]; then
+            words="$words or '${!i}'"
+        else
+            words="$words, '${!i}'"
+        fi
+    done
+    echo "$words"
+}
+
+# True if the first argument is one of the others
+contains() {
+    local want="$1" item
+    shift
+    for item in "$@"; do
+        [ "$item" = "$want" ] && return 0
+    done
+    return 1
+}
+
+# Sets ESCAPED to a branch name as an extended regular expression that matches
+# it literally. Only the characters special in one are escaped: a backslash
+# before any other makes newer GNU grep print a warning.
+ere_escape() {
+    local c i
+    ESCAPED=""
+    for ((i = 0; i < ${#1}; i++)); do
+        c="${1:i:1}"
+        case "$c" in
+            '.'|'['|"\\"|'*'|'^'|'$'|'+'|'?'|'('|')'|'{'|'|') ESCAPED="$ESCAPED\\$c" ;;
+            *) ESCAPED="$ESCAPED$c" ;;
+        esac
+    done
+}
+
+# Branches besides the default one that a branch is done with once merged
+# into, set for each repository with 'git config gitrid.mergeTargets dev': for
+# a flow where pull requests go to dev and dev later goes to main. Several
+# names are separated by spaces or commas, or the key is given more than once.
+# A name written as 'origin/dev' or 'refs/heads/dev' is taken as 'dev'.
+EXTRA_TARGETS=()
+while IFS= read -r line; do
+    line="${line//,/ }"
+    read -r -a names <<< "${line//$'\r'/ }"
+    for name in "${names[@]}"; do
+        name="${name#refs/heads/}"
+        name="${name#refs/remotes/}"
+        name="${name#origin/}"
+        if [ -n "$name" ] && ! contains "$name" "$DEFAULT_BRANCH" "${EXTRA_TARGETS[@]}"; then
+            EXTRA_TARGETS+=("$name")
+        fi
+    done
+done < <(git config --get-all gitrid.mergeTargets 2>/dev/null)
+
+# Branches to exclude from deletion. A branch is protected only if its whole
+# name is one of these, so 'feature/device' is not protected by 'dev'. A merge
+# target is protected too: once merged into main it would otherwise count as
+# merged itself, and --merged would delete it.
+PROTECTED_NAMES=("$DEFAULT_BRANCH" dev develop development)
 
 # What a branch is checked against to see if it is merged: the local default
-# branch and, if there is one, the remote's copy of it as last fetched. After a
-# pull request is merged on the remote the local default branch is often
-# behind, so checking it alone would report the merged branch as unmerged.
+# branch and, if there is one, the remote's copy of it as last fetched, then
+# the same for each merge target. After a pull request is merged on the remote
+# the local branch is often behind, so checking it alone would report the
+# merged branch as unmerged.
 MERGE_TARGETS=()
-MERGED_INTO=""
-if ref_exists "refs/heads/$DEFAULT_BRANCH"; then
-    MERGE_TARGETS+=("refs/heads/$DEFAULT_BRANCH")
-    MERGED_INTO="'$DEFAULT_BRANCH'"
+TARGET_NAMES=()
+# The local branches whose commits are kept when a branch is deleted, besides
+# those on a remote: the default branch and the merge targets
+KEPT_LOCAL=()
+KEPT_NAMES=("$DEFAULT_BRANCH")
+# Merge targets that are no branch here or on origin, left out with a note
+MISSING_TARGETS=()
+for name in "$DEFAULT_BRANCH" "${EXTRA_TARGETS[@]}"; do
+    contains "$name" "${PROTECTED_NAMES[@]}" || PROTECTED_NAMES+=("$name")
+    found=false
+    if ref_exists "refs/heads/$name"; then
+        MERGE_TARGETS+=("refs/heads/$name")
+        TARGET_NAMES+=("$name")
+        KEPT_LOCAL+=("refs/heads/$name")
+        found=true
+    fi
+    if ref_exists "refs/remotes/origin/$name"; then
+        MERGE_TARGETS+=("refs/remotes/origin/$name")
+        TARGET_NAMES+=("origin/$name")
+        found=true
+    fi
+    if [ "$name" != "$DEFAULT_BRANCH" ]; then
+        if [ "$found" = true ]; then
+            KEPT_NAMES+=("$name")
+        else
+            MISSING_TARGETS+=("$name")
+        fi
+    fi
+done
+if [ ${#TARGET_NAMES[@]} -eq 0 ]; then
+    TARGET_NAMES=("$DEFAULT_BRANCH")
 fi
-if ref_exists "refs/remotes/origin/$DEFAULT_BRANCH"; then
-    MERGE_TARGETS+=("refs/remotes/origin/$DEFAULT_BRANCH")
-    MERGED_INTO="${MERGED_INTO:+$MERGED_INTO or }'origin/$DEFAULT_BRANCH'"
-fi
-if [ -z "$MERGED_INTO" ]; then
-    MERGED_INTO="'$DEFAULT_BRANCH'"
-fi
+MERGED_INTO=$(or_list "${TARGET_NAMES[@]}")
+KEPT_IN=$(or_list "${KEPT_NAMES[@]}")
+
+PROTECTED_LIST=$(IFS='|'; echo "${PROTECTED_NAMES[*]}")
+# The same names as a regular expression, with '.' and the like taken literally
+EXCEPTIONS=""
+for name in "${PROTECTED_NAMES[@]}"; do
+    ere_escape "$name"
+    EXCEPTIONS="${EXCEPTIONS:+$EXCEPTIONS|}$ESCAPED"
+done
 
 # All local branches, one name per line
 all_branches() {
@@ -110,15 +202,12 @@ upstream_state() {
 }
 
 # How many commits a branch holds that are on no remote branch and not in the
-# local default branch: the work that deleting the branch would lose. A branch
-# whose pull request was squash-merged and its remote branch deleted counts
-# its commits here too, since git can't tell they are in the default branch.
+# local default branch or a local merge target: the work that deleting the
+# branch would lose. A branch whose pull request was squash-merged and its
+# remote branch deleted counts its commits here too, since git can't tell
+# they are in the default branch.
 local_only_count() {
-    local kept=(--remotes)
-    if ref_exists "refs/heads/$DEFAULT_BRANCH"; then
-        kept+=("refs/heads/$DEFAULT_BRANCH")
-    fi
-    git rev-list --count "refs/heads/$1" --not "${kept[@]}" 2>/dev/null || echo 0
+    git rev-list --count "refs/heads/$1" --not --remotes "${KEPT_LOCAL[@]}" 2>/dev/null || echo 0
 }
 
 # "1 commit on no remote" or "3 commits on no remote"
@@ -147,7 +236,7 @@ for either of two, 'feat/|fix/'. A pattern that starts with '-' is written
 
 Never deleted: the branch you are on, a branch checked out in another
 worktree, and the branches named exactly
-$EXCEPTIONS.
+$PROTECTED_LIST.
 
 Which branches:
   --merged, -m    Only branches fully merged into $MERGED_INTO
@@ -161,7 +250,17 @@ Which branches:
   With --merged or --gone the pattern can be left out: all that pass are taken.
   Without --merged, branches are deleted whether merged or not, so work that
   was never pushed is lost. The list shows how many commits each branch holds
-  that are on no remote branch and not in '$DEFAULT_BRANCH'.
+  that are on no remote branch and not in $KEPT_IN.
+
+Merge targets, set for each repository:
+  git config gitrid.mergeTargets dev
+                  Also count a branch as merged once it is merged into 'dev'
+                  or 'origin/dev', for a flow where pull requests go to dev
+                  and dev later goes to $DEFAULT_BRANCH. Several names are
+                  separated by spaces or commas ('dev staging'), or added
+                  with 'git config --add'. A merge target is protected; one
+                  that is no branch here or on origin is left out, with a note.
+                  Here: ${EXTRA_TARGETS[*]:-none set}.
 
 How it runs:
   --dry-run, -n   Show what would be deleted and stop. Nothing is deleted
@@ -269,6 +368,14 @@ fi
 if [ "$PORCELAIN" = true ] && [ "$LIST_MODE" != true ]; then
     echo "Error: --porcelain is used with --list." >&2
     exit $EXIT_ERROR
+fi
+
+# A merge target that matches no branch is most likely a typo: say so, on
+# stderr, whenever "merged" is judged
+if [ "$MERGED" = true ] || [ "$LIST_MODE" = true ]; then
+    for name in "${MISSING_TARGETS[@]}"; do
+        echo "Note: merge target '$name' (git config gitrid.mergeTargets) is no branch here or on origin, so it is left out." >&2
+    done
 fi
 
 # Handle list mode
@@ -381,7 +488,7 @@ done <<< "$(checked_out_branches)"
 
 # Check if any branches match the pattern
 if [ -z "$LOCAL_BRANCHES" ]; then
-    echo "No local branches found matching pattern: $PATTERN$CHOSEN_BY (excluding $EXCEPTIONS branches)"
+    echo "No local branches found matching pattern: $PATTERN$CHOSEN_BY (excluding $PROTECTED_LIST branches)"
     exit $EXIT_NO_MATCH
 fi
 
@@ -408,7 +515,7 @@ if [ "$MERGED" = true ]; then
 fi
 
 if [ "$WORK_AT_RISK" = true ]; then
-    echo "WARNING: commits on no remote are not in '$DEFAULT_BRANCH' either. Deleting the branch loses them,"
+    echo "WARNING: commits on no remote are not in $KEPT_IN either. Deleting the branch loses them,"
     echo "unless its pull request was squash-merged and the remote branch then deleted."
 fi
 
