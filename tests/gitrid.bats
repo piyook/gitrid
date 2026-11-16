@@ -310,6 +310,121 @@ branch_count() {
     assert_output_has "fully merged into 'origin/main'"
 }
 
+# --- merge targets ---------------------------------------------------------
+
+# A branch with one commit, merged into dev with a merge commit and not pushed
+merge_into_dev() {
+    new_branch "$1" 1
+    git checkout -q dev
+    git merge -q --no-ff "$1" -m "merge $1"
+    git checkout -q main
+}
+
+@test "without a merge target a branch merged only into dev is unmerged" {
+    merge_into_dev feature/dev-merged
+    run gitrid --list --porcelain
+    assert_output_has "$(printf 'unmerged\tfeature/dev-merged\t1')"
+
+    run gitrid --merged --dry-run
+    assert_listed chore/fresh feature/login feature/remote-merged
+}
+
+@test "with dev as a merge target a branch merged into dev is merged" {
+    merge_into_dev feature/dev-merged
+    git config gitrid.mergeTargets dev
+
+    run gitrid --list --porcelain
+    assert_output_has "$(printf 'merged\tfeature/dev-merged\t0')"
+    assert_output_has "$(printf 'protected\tdev')"
+
+    run gitrid --merged --dry-run
+    assert_status 0
+    assert_listed chore/fresh feature/dev-merged feature/login feature/remote-merged
+    assert_output_has "fully merged into 'main', 'origin/main' or 'dev'"
+    refute_output_has "WARNING"
+}
+
+@test "a merge target counts as merged into on the remote too" {
+    new_branch feature/dev-remote 1
+    git push -q origin dev
+    git checkout -q dev
+    git merge -q --no-ff feature/dev-remote -m "merge feature/dev-remote"
+    git push -q origin dev
+    git reset -q --hard HEAD~1
+    git checkout -q main
+    git config gitrid.mergeTargets dev
+
+    run gitrid --merged feature/dev --dry-run
+    assert_status 0
+    assert_listed feature/dev-remote
+    assert_output_has "'origin/dev'"
+}
+
+@test "a merge target is protected, even with a name that is not protected" {
+    git checkout -q -b staging main
+    git checkout -q main
+    git config gitrid.mergeTargets staging
+
+    run gitrid --list --porcelain
+    assert_output_has "$(printf 'protected\tstaging')"
+
+    run gitrid --nuke --merged --yes
+    assert_status 0
+    assert_branch staging
+    assert_branch dev
+}
+
+@test "several merge targets are separated by spaces or commas, and missing ones are passed over" {
+    git checkout -q -b staging main
+    git checkout -q main
+    merge_into_dev feature/dev-merged
+    git config gitrid.mergeTargets "dev, nosuch"
+    git config --add gitrid.mergeTargets staging
+
+    run gitrid --merged --dry-run
+    assert_status 0
+    assert_listed chore/fresh feature/dev-merged feature/login feature/remote-merged
+    assert_output_has "fully merged into 'main', 'origin/main', 'dev' or 'staging'"
+    assert_output_has "Note: merge target 'nosuch' (git config gitrid.mergeTargets) is no branch here or on origin"
+
+    run gitrid --help
+    assert_output_has "Here: dev nosuch staging."
+    assert_output_has "main|dev|develop|development|nosuch|staging"
+}
+
+@test "a merge target's name is taken literally, not as a regular expression" {
+    git checkout -q -b release.1 main
+    git checkout -q -b releasex1 main
+    git checkout -q -b a+b main
+    git checkout -q -b aab main
+    git checkout -q -b 'rel}' main
+    git checkout -q main
+    git config gitrid.mergeTargets 'release.1 a+b rel}'
+
+    run gitrid 'rel|ab' --dry-run
+    assert_status 0
+    assert_listed aab releasex1
+    refute_output_has "stray"
+}
+
+@test "a merge target written as origin/dev or refs/heads/dev is taken as dev" {
+    merge_into_dev feature/dev-merged
+    git config gitrid.mergeTargets origin/dev
+    run gitrid --merged feature/dev --dry-run
+    assert_status 0
+    assert_listed feature/dev-merged
+
+    git config gitrid.mergeTargets refs/heads/dev
+    run gitrid --merged feature/dev --dry-run
+    assert_listed feature/dev-merged
+}
+
+@test "the warning names the merge targets that exist, and only those" {
+    git config gitrid.mergeTargets "dev nosuch"
+    run gitrid feature/ --dry-run
+    assert_output_has "WARNING: commits on no remote are not in 'main' or 'dev' either."
+}
+
 # --- protected branches ----------------------------------------------------
 
 @test "a branch is protected only if its whole name is a protected name" {

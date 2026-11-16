@@ -53,13 +53,23 @@ Only local branches are deleted. Remote branches are never touched.
 
 Which branches:
 
-- `--merged` or `-m`: only branches fully MERGED into main (or master). A branch counts as merged if it is merged into your local main or into 'origin/main' as last fetched, so after a pull request is merged on the remote, run `git fetch` and the branch shows as merged without updating your local main first.
+- `--merged` or `-m`: only branches fully MERGED into main (or master). A branch counts as merged if it is merged into your local main or into 'origin/main' as last fetched, so after a pull request is merged on the remote, run `git fetch` and the branch shows as merged without updating your local main first. Branches that merge into `dev` first can count too: see [Merging into dev first](#merging-into-dev-first).
 - `--gone` or `-g`: only branches whose upstream branch has been deleted on the remote, as it usually is once a pull request is merged. Run `git fetch --prune` first. This finds squash-merged branches, which `--merged` can not, since their commits are never in main. A gone upstream is not proof of a merge: a remote branch deleted for any other reason looks the same, and a branch that was never pushed is never "gone".
 - `--nuke`: ALL local branches except the protected ones and the one you are on :bomb: :bomb: :boom: It takes no pattern: giving both is an error.
 
 With `--merged` or `--gone` the pattern can be left out, and every branch that passes is taken. Used together, a branch must pass both. Without `--merged`, branches are deleted whether merged or not, so the list shows how many commits each one holds that are on no remote branch and not in main: work that deleting the branch would lose.
 
 <i>Note: branches that are newly created from the main branch with no new commits that match the search pattern will also be deleted with --merged since they are fully merged by default.</i>
+
+### Merging into dev first
+
+If pull requests go to `dev` and `dev` later goes to `main`, a feature branch merged into `dev` is done with, but it is not in `main` yet, so `--merged` and `--list` would call it unmerged. Tell gitrid about `dev` once in that repository:
+
+```bash
+git config gitrid.mergeTargets dev
+```
+
+From then on a branch merged into `dev` or `origin/dev` counts as merged, just as one merged into `main` does: `--merged` takes it, `--list` marks it `[MERGED]`, and its commits are not counted as work that deleting it would lose. Several names are separated by spaces or commas (`git config gitrid.mergeTargets "dev staging"`), or added one at a time with `git config --add gitrid.mergeTargets staging`. Write the branch name: `origin/dev` is taken as `dev`. A name that is no branch locally or on origin, such as a typo, is left out with a note. A merge target is protected, so `--merged` never deletes it, even once it is merged into main. The setting is for that repository only; `gitrid --help` shows what is set (`Here: ...`), and `git config --unset-all gitrid.mergeTargets` removes it.
 
 How it runs:
 
@@ -101,8 +111,8 @@ gitrid --list
 
 In a terminal the branch names are coloured:
 
-- 🔴 **Red**: Protected branches (main, dev, develop, development)
-- 🟢 **Green**: Merged branches (fully merged into main)
+- 🔴 **Red**: Protected branches (main, dev, develop, development, and any [merge targets](#merging-into-dev-first))
+- 🟢 **Green**: Merged branches (fully merged into main, or a merge target)
 - 🟡 **Yellow**: Unmerged branches (not yet merged)
 
 Where the output is not a terminal (piped, or run by a script) the status is a label in front of the name:
